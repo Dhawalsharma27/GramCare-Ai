@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GramCare AI – Rural Healthcare Decision-Support & Triage Assistant</title>
+  <meta name="description" content="AI-powered rural healthcare assistant providing early symptom analysis, longitudinal risk prediction, affordable generic medicine alternatives, and doctor referrals for rural communities and ASHA workers.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="#" class="brand" id="brand-link">
+        <div class="brand-icon">✚</div>
+        <div class="brand-text">
+          <h1>GramCare <span>AI</span></h1>
+          <div class="brand-tag" id="tagline-text">Rural Healthcare Decision-Support</div>
+        </div>
+      </a>
+
+      <div class="nav-controls">
+        <div class="nav-pills">
+          <button class="nav-pill-btn active" id="tab-btn-triage" onclick="switchMainTab('triage')">
+            🩺 <span id="nav-triage-text">Triage Studio</span>
+          </button>
+          <button class="nav-pill-btn" id="tab-btn-directory" onclick="switchMainTab('directory')">
+            👥 <span id="nav-patients-text">Patient Registry</span>
+          </button>
+          <button class="nav-pill-btn" id="tab-btn-about" onclick="switchMainTab('about')">
+            ℹ️ <span id="nav-about-text">About System</span>
+          </button>
+        </div>
+
+        <div class="system-status" id="system-status-indicator" title="Triage ML Engine Status">
+          <span class="pulse-dot"></span>
+          <span id="status-label">ML Active</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+
+    <!-- Role / Mode Toggle Banner -->
+    <section class="role-banner" id="role-banner">
+      <div class="role-info">
+        <h2 id="role-headline">
+          <span id="role-icon">👩‍⚕️</span> <span id="role-title">ASHA Worker & Kiosk Mode</span>
+        </h2>
+        <p id="role-subtext">Record patient intake, conduct voice symptom triage, detect recurring chronic symptoms, and issue referral slips.</p>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button class="btn-secondary" id="mode-toggle-btn" onclick="toggleRoleMode()">
+          🔄 <span id="mode-btn-label">Switch to Patient Mode</span>
+        </button>
+        <button class="btn-secondary" id="lang-toggle-btn" onclick="toggleLanguage()">
+          🌐 <span id="lang-btn-label">हिंदी (Hindi)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- TAB 1: TRIAGE STUDIO -->
+    <div id="tab-triage" class="tab-content active">
+      <div class="triage-grid">
+        
+        <!-- Left Column: Input Form & Voice Studio -->
+        <div class="input-column">
+          
+          <!-- Patient Intake Card -->
+          <div class="card" id="patient-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span>👤</span> <span id="patient-section-title">Patient Profile & Identification</span>
+              </div>
+              <div class="patient-id-tag" id="patient-id-display">ID: Auto-Generated</div>
+            </div>
+
+            <!-- Existing Patient Fast Search -->
+            <div class="form-group" style="margin-bottom: 14px;" id="lookup-group">
+              <label for="patient-search-input" id="lbl-search">Search Existing Patient (Name / Phone / Village)</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="patient-search-input" class="form-input" placeholder="e.g. Ramesh Kumar or 9876..." onkeyup="handlePatientSearch(event)">
+                <button type="button" class="btn-secondary" onclick="executePatientSearch()" id="btn-search-patient">🔍 Search</button>
+              </div>
+              <div id="search-results-dropdown" style="display: none; background: white; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 4px; max-height: 140px; overflow-y: auto;"></div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="patient-name" id="lbl-name">Full Name *</label>
+                <input type="text" id="patient-name" class="form-input" placeholder="e.g. Ramesh Kumar" required>
+              </div>
+              <div class="form-group">
+                <label for="patient-phone" id="lbl-phone">Mobile Number</label>
+                <input type="tel" id="patient-phone" class="form-input" placeholder="e.g. 9876543210">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="patient-village" id="lbl-village">Village / Gram *</label>
+                <input type="text" id="patient-village" class="form-input" placeholder="e.g. Rampur" required>
+              </div>
+              <div class="form-group">
+                <label for="patient-age" id="lbl-age">Age</label>
+                <input type="number" id="patient-age" class="form-input" placeholder="e.g. 45" min="1" max="120">
+              </div>
+              <div class="form-group">
+                <label for="patient-gender" id="lbl-gender">Gender</label>
+                <select id="patient-gender" class="form-select">
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Voice & Symptom Input Card -->
+          <div class="card" id="symptoms-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span>🎙️</span> <span id="symptom-section-title">Symptom Input & Voice Assistant</span>
+              </div>
+              <span class="card-badge" id="voice-engine-badge">Web Speech API</span>
+            </div>
+
+            <!-- Voice Hero Recording Area -->
+            <div class="voice-hero">
+              <button type="button" class="mic-button" id="mic-btn" onclick="toggleVoiceRecording()" title="Click to Speak">
+                🎤
+              </button>
+              <div class="voice-status-text" id="voice-status">Tap Microphone and Speak Symptoms</div>
+              <div class="voice-subtext" id="voice-subtext">Supports Hindi, English, and regional accents (Offline Vosk/Whisper ready)</div>
+            </div>
+
+            <!-- Symptom Textarea -->
+            <div class="form-group">
+              <label for="symptoms-input" id="lbl-symptoms">Reported Symptoms Description *</label>
+              <textarea id="symptoms-input" class="symptom-textarea" placeholder="Describe symptoms (e.g., persistent dry cough for 3 days, mild fever, body ache, breathlessness)..." required></textarea>
+            </div>
+
+            <!-- Quick Symptom Chips -->
+            <div class="chips-label" id="lbl-quick-chips">Common Rural Symptoms (Click to Add):</div>
+            <div class="symptom-chips" id="quick-chips-container">
+              <span class="symptom-chip" onclick="toggleSymptomChip('Fever', this)">🌡️ High Fever</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Mild Fever', this)">🤒 Mild Fever</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Cough', this)">🗣️ Cough</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Chest Pain', this)">💔 Chest Pain</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Breathlessness', this)">🫁 Breathlessness</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Headache', this)">🤕 Headache</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Stomach Ache', this)">🤢 Stomach Pain</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Vomiting', this)">🤮 Vomiting</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Diarrhea', this)">💧 Loose Motions</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Skin Rash', this)">🔴 Skin Rash / Itching</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Joint Pain', this)">🦴 Joint Pain</span>
+              <span class="symptom-chip" onclick="toggleSymptomChip('Fatigue', this)">🥱 Weakness / Fatigue</span>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="button" class="btn-primary" id="btn-submit-triage" onclick="submitTriage()">
+              ⚡ <span id="btn-submit-text">Run AI Triage & Risk Assessment</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Results & Clinical Guidance -->
+        <div class="results-column">
+          
+          <!-- Placeholder Prompt when empty -->
+          <div class="card" id="empty-state-card" style="text-align: center; padding: 48px 24px;">
+            <div style="font-size: 52px; margin-bottom: 16px;">🩺</div>
+            <h3 style="font-family: var(--font-heading); font-size: 19px; margin-bottom: 8px;" id="empty-heading">Ready for Triage Analysis</h3>
+            <p style="font-size: 14px; color: var(--text-muted); max-width: 380px; margin: 0 auto;" id="empty-subtext">
+              Enter symptoms by voice or text and click "Run AI Triage" to generate clinical risk level, matched condition, precautions, and generic medicine alternatives.
+            </p>
+          </div>
+
+          <!-- Loading Indicator Card -->
+          <div class="card" id="loading-card" style="display: none; text-align: center; padding: 40px 24px;">
+            <div class="pulse-dot" style="width: 24px; height: 24px; margin: 0 auto 16px;"></div>
+            <h4 style="font-family: var(--font-heading); font-size: 17px;">Analyzing Symptoms with Machine Learning...</h4>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">Vectorizing features & evaluating longitudinal history...</p>
+          </div>
+
+          <!-- Active Triage Results Card -->
+          <div class="card results-card" id="results-card">
+            
+            <!-- Acuity Level Banner -->
+            <div class="triage-acuity-banner" id="acuity-banner">
+              <div class="acuity-icon" id="acuity-icon">⚠️</div>
+              <div class="acuity-content">
+                <h3 id="acuity-title">HIGH RISK</h3>
+                <p id="acuity-summary">Immediate Medical Attention Required</p>
+              </div>
+            </div>
+
+            <!-- Longitudinal Risk Alert Card (Progressing / Chronic Alert) -->
+            <div class="longitudinal-alert-card" id="longitudinal-alert-box">
+              <div class="longitudinal-header">
+                <span>⏱️</span> <span id="longitudinal-title">Longitudinal Risk Alert (Patient History)</span>
+              </div>
+              <div class="longitudinal-body" id="longitudinal-message">
+                Key symptoms ('cough', 'fever') recurred across 2 visits within the last 60 days. Risk escalated to Medium to ensure timely clinical evaluation.
+              </div>
+            </div>
+
+            <!-- Predicted Condition & Clinical Description -->
+            <div class="condition-section">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div class="condition-title" id="condition-title">Pneumonia</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--primary);" id="confidence-label">Confidence: 94%</div>
+              </div>
+              <div class="condition-desc" id="condition-desc">
+                An infection that inflames the air sacs in one or both lungs, requiring antibiotic treatment and clinical monitoring.
+              </div>
+            </div>
+
+            <!-- Clinical Action Advice -->
+            <div style="margin-bottom: 20px;">
+              <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">📋 Action Advice:</h4>
+              <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5;" id="action-advice-text">
+                Visit the nearest Primary Health Centre (PHC) for immediate consultation.
+              </p>
+            </div>
+
+            <!-- Precautions Checklist -->
+            <div style="margin-bottom: 20px;">
+              <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">🛡️ Clinical Precautions:</h4>
+              <ul class="precautions-list" id="precautions-list">
+                <li>Rest adequately in an upright position.</li>
+                <li>Stay hydrated with clean boiled water.</li>
+              </ul>
+            </div>
+
+            <!-- Affordable Generic Medicines (Jan Aushadhi Scheme) -->
+            <div class="generic-meds-card" id="generic-meds-container">
+              <div class="generic-meds-title">
+                <span>💊 Affordable Generic Alternatives</span>
+                <span class="jan-badge">Jan Aushadhi Scheme</span>
+              </div>
+              <div id="generic-meds-list">
+                <!-- Injected via JS -->
+              </div>
+              <div style="font-size: 11.5px; color: #166534; margin-top: 10px; font-style: italic;">
+                * Available at nearby Pradhan Mantri Bhartiya Jan Aushadhi Kendras. Always consult a healthcare officer for prescription medicines.
+              </div>
+            </div>
+
+            <!-- Doctor Referral Action Slip -->
+            <div class="referral-box" id="referral-slip-box">
+              <div class="referral-header">🏥 Referral Guidance Slip</div>
+              <div class="referral-facility" id="referral-facility">Primary Health Centre (PHC)</div>
+              <div class="referral-action" id="referral-action">Accompany patient or arrange 108 ambulance transport.</div>
+              <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button type="button" class="btn-secondary" onclick="printReferralSlip()" id="btn-print-slip">
+                  🖨️ Print / Save Referral Slip
+                </button>
+                <button type="button" class="btn-secondary" onclick="viewPatientTimeline()" id="btn-view-timeline">
+                  📜 View Health Timeline
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TAB 2: PATIENT REGISTRY & HISTORY -->
+    <div id="tab-directory" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>👥</span> <span>Rural Patient Registry & Consultation History</span>
+          </div>
+          <button class="btn-secondary" onclick="loadPatientRegistry()">🔄 Refresh List</button>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <input type="text" id="registry-search-input" class="form-input" placeholder="Search by Patient Name, ID, or Village..." onkeyup="filterPatientTable(this.value)">
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="patient-table">
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Name</th>
+                <th>Village</th>
+                <th>Age / Gender</th>
+                <th>Total Visits</th>
+                <th>Latest Risk</th>
+                <th>Latest Condition</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="patient-table-body">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted);">Loading patient registry...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: ABOUT & ARCHITECTURE -->
+    <div id="tab-about" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>ℹ️</span> <span>About GramCare AI – Rural Decision-Support System</span>
+          </div>
+          <span class="card-badge">Version 1.1.0</span>
+        </div>
+
+        <div style="font-size: 14px; line-height: 1.7; color: var(--text-main);">
+          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">1. Purpose & Mission</h3>
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            GramCare AI is an AI-powered rural healthcare assistant designed as a clinical decision-support tool for rural patients, ASHA workers, and digital kiosks (Jan Aushadhi Kendras & Common Service Centres). It tackles doctor shortages, long travel distances, and delayed disease detection by providing early symptom triage, longitudinal risk progression, and affordable generic medicine guidance.
+          </p>
+
+          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">2. Important Clarification on Medical Scope</h3>
+          <blockquote style="background: var(--surface-alt); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 16px; font-weight: 500;">
+            "GramCare AI does <strong>not</strong> replace doctors. It acts as an early decision-support system to determine whether home care is sufficient, or if clinical consultation and emergency referral are necessary."
+          </blockquote>
+
+          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">3. Longitudinal Risk Engine</h3>
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            Unlike isolated triage tools that only evaluate a single consultation, GramCare AI queries previous consultations within the last 30–60 days. If key symptoms recur or worsen across multiple visits, the system escalates the risk level and alerts the ASHA worker that the patient may have a progressing or chronic condition requiring clinical diagnosis.
+          </p>
+
+          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">4. Affordable Generic Medicines</h3>
+          <p style="color: var(--text-muted);">
+            To reduce the financial burden of healthcare on rural families, GramCare AI highlights generic molecule equivalents available under the Pradhan Mantri Bhartiya Jan Aushadhi Pariyojana, offering estimated cost savings of 50% to 80% over commercial branded drugs.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal: Patient Health Timeline -->
+  <div class="modal-overlay" id="timeline-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="timeline-modal-title">Patient Longitudinal Health Timeline</div>
+        <button class="modal-close" onclick="closeTimelineModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="timeline-modal-body">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div style="max-width: 1240px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <strong>GramCare AI</strong> – Rural Healthcare Decision Support System
+      </div>
+      <div>
+        Designed for ASHA Workers, Ayushman Arogya Mandirs, & Jan Aushadhi Kendras
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
