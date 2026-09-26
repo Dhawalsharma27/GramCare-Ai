@@ -40,46 +40,110 @@ class KnowledgeBase:
                 "risk_level": str(row["risk_level"]) if pd.notna(row.get("risk_level")) else "Medium"
             }
 
+    def check_emergency_override(self, symptoms: str) -> Optional[Dict[str, Any]]:
+        """
+        Safety Protocol: Detects critical red-flag emergency symptoms that must bypass
+        normal triage and unconditionally trigger immediate emergency medical care.
+        """
+        text = symptoms.lower()
+        emergency_flags = [
+            ("chest pain", "Acute chest pain / potential cardiac crisis"),
+            ("heart attack", "Suspected myocardial infarction / heart attack"),
+            ("shortness of breath", "Severe respiratory distress"),
+            ("difficulty breathing", "Severe airway obstruction / acute dyspnea"),
+            ("breathlessness", "Acute breathlessness"),
+            ("loss of consciousness", "Unconsciousness / syncope"),
+            ("unconscious", "Unconsciousness / altered sensorium"),
+            ("fainting", "Acute collapse / fainting spell"),
+            ("heavy bleeding", "Acute hemorrhage / severe blood loss"),
+            ("stomach bleeding", "Internal GI hemorrhage"),
+            ("blood vomiting", "Hematemesis / upper GI bleeding"),
+            ("slurred speech", "Suspected acute stroke / cerebrovascular event"),
+            ("paralysis", "Acute neurological deficit / stroke symptoms"),
+            ("convulsion", "Seizure activity / status epilepticus"),
+            ("seizure", "Acute seizure / neurological emergency"),
+            ("coma", "Comatose state / severe depression of consciousness")
+        ]
+
+        for flag, description in emergency_flags:
+            if flag in text:
+                return {
+                    "is_emergency": True,
+                    "matched_symptom": flag,
+                    "description": description,
+                    "action": "Immediate 108 Emergency Ambulance transfer to Primary Health Centre (PHC) or District Hospital required. Do not delay."
+                }
+        return None
+
     def match_condition(self, user_symptoms: str) -> Optional[Dict[str, Any]]:
         """Find the best matching condition based on symptom keyword overlap."""
+        top_list = self.match_top_conditions(user_symptoms, top_k=1)
+        return top_list[0] if top_list else None
+
+    def match_top_conditions(self, user_symptoms: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """Find the top-K probable conditions with relative percentage confidence scores."""
         if not self.disease_data:
-            return None
+            return []
             
         user_words = set(re.findall(r'\w+', user_symptoms.lower()))
         if not user_words:
-            return None
+            return []
 
-        best_score = -1.0
-        best_disease = None
+        scored_matches = []
 
         for disease, data in self.disease_data.items():
             disease_symptoms_text = " ".join(data["symptoms"]).lower()
             disease_words = set(re.findall(r'\w+', disease_symptoms_text))
-            
-            # Add disease name words into matching
             disease_words.update(re.findall(r'\w+', disease.lower()))
 
             intersection = user_words.intersection(disease_words)
             if intersection:
-                score = len(intersection) / (len(user_words) + len(disease_words) - len(intersection))
-                if score > best_score:
-                    best_score = score
-                    best_disease = data
+                # Jaccard index + weighting for disease name mentions
+                jaccard = len(intersection) / (len(user_words) + len(disease_words) - len(intersection))
+                name_bonus = 0.3 if any(w in disease.lower() for w in user_words) else 0.0
+                final_score = jaccard + name_bonus
+                scored_matches.append((final_score, data))
 
-        return best_disease
+        if not scored_matches:
+            # Fallback if no exact symptom word matched
+            first_key = list(self.disease_data.keys())[0]
+            return [{**self.disease_data[first_key], "relative_confidence": 1.0, "confidence_pct": 100}]
+
+        # Sort descending by score
+        scored_matches.sort(key=lambda x: x[0], reverse=True)
+        top_matches = scored_matches[:top_k]
+
+        total_score = sum(score for score, _ in top_matches) or 1.0
+        results = []
+        for score, data in top_matches:
+            rel_conf = round(score / total_score, 3)
+            conf_pct = max(5, int(rel_conf * 100))
+            results.append({
+                **data,
+                "match_score": round(score, 3),
+                "relative_confidence": rel_conf,
+                "confidence_pct": conf_pct
+            })
+
+        # Ensure percentages sum to approx 100
+        if len(results) == 1:
+            results[0]["confidence_pct"] = 100
+
+        return results
 
     def get_action_advice(self, risk_level: str) -> str:
         risk_level_norm = risk_level.strip().capitalize()
         if risk_level_norm == "High":
             return "Urgent: Immediate medical attention required. Please visit the nearest Primary Health Centre (PHC) or emergency clinic immediately."
         elif risk_level_norm == "Medium":
-            return "Moderate: Schedule a consultation with a local healthcare worker (ASHA / ANM) or primary clinic within 24-48 hours. Monitor symptoms carefully."
+            return "Medium Risk: Clinical evaluation required. Do NOT rely on self-cure. Connect immediately with an online doctor via the live Video Call consultation below, or visit an Ayushman Arogya Mandir / PHC within 24 hours."
         else:
             return "Mild: Home care and observation recommended. Follow basic hygiene, maintain hydration, and observe precautions. Consult a clinic if symptoms worsen."
 
-    def get_generic_medicines(self, condition: Optional[str], risk_level: str) -> List[Dict[str, Any]]:
-        """Provides affordable generic medicine alternatives (Jan Aushadhi Scheme) with estimated savings."""
+    def get_generic_medicines(self, condition: Optional[str], risk_level: str, allergies: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Provides affordable generic medicine alternatives (Jan Aushadhi Scheme) with allergy filtering."""
         cond = (condition or "").strip().lower()
+        allergies_clean = [a.lower().strip() for a in (allergies or [])]
 
         # Standard generic mappings for primary rural healthcare conditions
         catalog = {
@@ -126,30 +190,54 @@ class KnowledgeBase:
 
         # Match condition
         if "cold" in cond:
-            return catalog["cold"]
+            selected_meds = catalog["cold"]
         elif "fungal" in cond or "tinea" in cond:
-            return catalog["fungal"]
+            selected_meds = catalog["fungal"]
         elif "allergy" in cond or "acne" in cond:
-            return catalog["allergy"]
+            selected_meds = catalog["allergy"]
         elif "gerd" in cond or "peptic" in cond or "ulcer" in cond:
-            return catalog["gerd"]
+            selected_meds = catalog["gerd"]
         elif "gastro" in cond or "diarrh" in cond:
-            return catalog["gastro"]
+            selected_meds = catalog["gastro"]
         elif "asthma" in cond or "bronch" in cond:
-            return catalog["asthma"]
+            selected_meds = catalog["asthma"]
         elif "malaria" in cond or "dengue" in cond or "typhoid" in cond:
-            return catalog["fever"]
+            selected_meds = catalog["fever"]
         elif "arthritis" in cond or "osteo" in cond or "spondyl" in cond:
-            return catalog["arthritis"]
+            selected_meds = catalog["arthritis"]
         elif "hypertens" in cond:
-            return catalog["hypertension"]
+            selected_meds = catalog["hypertension"]
         elif "diabet" in cond:
-            return catalog["diabetes"]
+            selected_meds = catalog["diabetes"]
         else:
-            return [
+            selected_meds = [
                 {"name": "Paracetamol 500mg", "type": "Tablet", "purpose": "General pain and mild fever management", "jan_aushadhi": True, "savings": "60% - 75% savings vs commercial brands"},
                 {"name": "Oral Rehydration Salts (ORS)", "type": "Sachet", "purpose": "Hydration and essential electrolytes", "jan_aushadhi": True, "savings": "50% - 60% savings vs commercial brands"}
             ]
+
+        # Drug Allergy Safety Screening
+        if allergies_clean:
+            filtered = []
+            for m in selected_meds:
+                m_name = m["name"].lower()
+                is_allergic = False
+                for a in allergies_clean:
+                    if not a:
+                        continue
+                    if a in m_name:
+                        is_allergic = True
+                        break
+                    if a in ("nsaid", "nsaids", "aspirin") and ("diclofenac" in m_name or "ibuprofen" in m_name or "aspirin" in m_name):
+                        is_allergic = True
+                        break
+                    if a in ("penicillin", "amoxicillin") and ("amoxicillin" in m_name or "penicillin" in m_name):
+                        is_allergic = True
+                        break
+                if not is_allergic:
+                    filtered.append(m)
+            return filtered
+
+        return selected_meds
 
     def get_referral_guidance(self, risk_level: str, condition: Optional[str]) -> Dict[str, Any]:
         """Provides structured referral guidance for ASHA workers and rural clinics."""
@@ -163,10 +251,10 @@ class KnowledgeBase:
             }
         elif norm_risk == "Medium":
             return {
-                "urgency": "Sub-Acute / Doctor Consultation",
-                "facility": "Ayushman Arogya Mandir (Sub-Centre) or visiting Medical Officer",
-                "timeframe": "Within 24 to 48 hours",
-                "asha_action": "Schedule telemedicine consultation or guide patient to next outpatient clinic visit."
+                "urgency": "Telemedicine Video Consultation Required (Medium Risk)",
+                "facility": "Online Medical Officer (e-Sanjeevani / GramCare Telehealth Network)",
+                "timeframe": "Connect Online Now (Doctor on Standby)",
+                "asha_action": "Click 'Connect to Doctor Online (Live Video Call)' to start video consultation. Do not advise self-cure."
             }
         else:
             return {

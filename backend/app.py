@@ -17,8 +17,17 @@ from backend.routes.patients import router as patients_router
 from backend.routes.history import router as history_router
 from backend.routes.feedback import router as feedback_router
 from backend.routes.voice import router as voice_router
+from backend.routes.analytics import router as analytics_router
+from backend.routes.telemedicine import router as telemedicine_router
+from backend.routes.auth import router as auth_router
+from backend.routes.translate import router as translate_router
 
-sys.stdout.reconfigure(encoding='utf-8')
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,9 +54,13 @@ app.add_middleware(
 # Register API endpoints
 app.include_router(predict_router)
 app.include_router(patients_router)
+app.include_router(analytics_router)
 app.include_router(history_router)
 app.include_router(feedback_router)
 app.include_router(voice_router)
+app.include_router(telemedicine_router)
+app.include_router(auth_router)
+app.include_router(translate_router)
 
 @app.get("/api/health")
 def health_check():
@@ -79,8 +92,14 @@ def api_info():
 
 # Mount static frontend application
 FRONTEND_DIR = BASE_DIR / "frontend"
-FRONTEND_DIR.mkdir(exist_ok=True)
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+if not FRONTEND_DIR.exists():
+    try:
+        FRONTEND_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GramCare AI – Rural Healthcare Decision-Support & Triage Assistant</title>
-  <meta name="description" content="AI-powered rural healthcare assistant providing early symptom analysis, longitudinal risk prediction, affordable generic medicine alternatives, and doctor referrals for rural communities and ASHA workers.">
+  <meta name="description" content="AI-powered rural healthcare assistant providing early symptom analysis, longitudinal risk prediction, emergency symptom override, affordable generic medicine alternatives, and doctor referrals for rural communities and ASHA workers.">
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,6 +30,9 @@
           <button class="nav-pill-btn" id="tab-btn-directory" onclick="switchMainTab('directory')">
             👥 <span id="nav-patients-text">Patient Registry</span>
           </button>
+          <button class="nav-pill-btn" id="tab-btn-analytics" onclick="switchMainTab('analytics')">
+            📊 <span id="nav-analytics-text">Outbreak Analytics</span>
+          </button>
           <button class="nav-pill-btn" id="tab-btn-about" onclick="switchMainTab('about')">
             ℹ️ <span id="nav-about-text">About System</span>
           </button>
@@ -38,6 +41,35 @@
         <div class="system-status" id="system-status-indicator" title="Triage ML Engine Status">
           <span class="pulse-dot"></span>
           <span id="status-label">ML Active</span>
+        </div>
+
+        <!-- Language Preference Dropdown (Option 1) -->
+        <div class="lang-dropdown-wrapper" id="nav-lang-dropdown-wrapper">
+          <button type="button" class="btn-lang-nav" id="nav-lang-btn" onclick="toggleNavLangDropdown(event)" title="Change Application Language & Dialect">
+            <span id="nav-lang-flag">🇬🇧</span>
+            <span id="nav-lang-label">English</span>
+            <span class="lang-arrow">▾</span>
+          </button>
+          <div class="lang-dropdown-menu" id="nav-lang-menu" style="display: none;">
+            <div class="lang-menu-header">🌐 Choose Language / बोली</div>
+            <div class="lang-menu-list" id="nav-lang-items">
+              <!-- Dynamically populated via JS -->
+            </div>
+            <div class="lang-menu-footer">
+              <button type="button" class="btn-more-langs" onclick="openLanguageModal()">⚙️ All Languages & Dialects...</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Authentication & Account Vault Pill -->
+        <div class="auth-header-pill" id="auth-header-container">
+          <button type="button" class="btn-auth-user" id="btn-user-profile" onclick="openAuthModal()" title="Click to Switch User / Login">
+            <span id="user-badge-icon">👩‍⚕️</span>
+            <span id="user-badge-name">ASHA Sunita Devi</span>
+          </button>
+          <button type="button" class="btn-auth-logout" id="btn-logout" onclick="handleLogout()" title="Log out">
+            🚪
+          </button>
         </div>
       </div>
     </div>
@@ -55,12 +87,13 @@
         <p id="role-subtext">Record patient intake, conduct voice symptom triage, detect recurring chronic symptoms, and issue referral slips.</p>
       </div>
 
-      <div style="display: flex; gap: 10px; align-items: center;">
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <button class="btn-secondary" id="mode-toggle-btn" onclick="toggleRoleMode()">
           🔄 <span id="mode-btn-label">Switch to Patient Mode</span>
         </button>
-        <button class="btn-secondary" id="lang-toggle-btn" onclick="toggleLanguage()">
-          🌐 <span id="lang-btn-label">हिंदी (Hindi)</span>
+        <!-- Language Selector Button (Option 2) -->
+        <button class="btn-secondary" id="lang-toggle-btn" onclick="openLanguageModal()" title="Change Language / Regional Dialect">
+          🌐 <span id="lang-btn-label">Language: English (Change)</span>
         </button>
       </div>
     </section>
@@ -89,6 +122,49 @@
                 <button type="button" class="btn-secondary" onclick="executePatientSearch()" id="btn-search-patient">🔍 Search</button>
               </div>
               <div id="search-results-dropdown" style="display: none; background: white; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 4px; max-height: 140px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- ASHA Patient Token Issuance Box (Visible in ASHA Worker Mode) -->
+            <div class="token-issuance-box" id="asha-token-box">
+              <div class="token-box-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 18px;">🎟️</span>
+                  <div>
+                    <div style="font-weight: 700; font-size: 13px; color: #0f766e;">Patient Intake Token ID</div>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">Unique community tracker for privacy-safe fieldwork</div>
+                  </div>
+                </div>
+                <button type="button" class="btn-primary" style="padding: 5px 12px; font-size: 12px;" onclick="generateAshaTokenForActivePatient()">
+                  ➕ Generate Token ID
+                </button>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; flex-wrap: wrap; gap: 8px;">
+                <div class="active-token-pill" id="active-token-display">
+                  <span style="opacity: 0.7;">Active Token:</span> <strong id="current-token-code">TK-RAM-84920</strong>
+                </div>
+                <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 11.5px;" onclick="openAshaTokenListModal()">
+                  📋 View Issued Tokens (<span id="asha-token-count">1</span>)
+                </button>
+              </div>
+            </div>
+
+            <!-- Self & Family Member Health Vault (Visible in Patient Self Mode) -->
+            <div class="family-vault-box" id="family-vault-box" style="display: none;">
+              <div class="family-vault-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 18px;">👨‍👩‍👧</span>
+                  <div>
+                    <div style="font-weight: 700; font-size: 13.5px; color: #1e3a8a;">My Health & Family Vault</div>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">Switch between family members (health records isolated for data privacy)</div>
+                  </div>
+                </div>
+                <button type="button" class="btn-primary" style="padding: 5px 12px; font-size: 12px;" onclick="openAddFamilyModal()">
+                  ➕ Add Family Member
+                </button>
+              </div>
+              <div class="family-pills-container" id="family-pills-list">
+                <!-- Dynamically populated: e.g. [👤 Myself] [👧 Aarav (Child)] [👵 Kailash (Parent)] -->
+              </div>
             </div>
 
             <div class="form-row">
@@ -120,6 +196,40 @@
                 </select>
               </div>
             </div>
+
+            <!-- Vulnerability & Safety Screening (Pregnancy, Comorbidities, Drug Allergies) -->
+            <div class="vulnerability-group" id="vulnerability-screening-box">
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">
+                Clinical Safety Screening:
+              </div>
+              
+              <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chk-pregnant">
+                  <span>🤰 Pregnant / Maternal Care</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chk-diabetic">
+                  <span>🩸 Diabetic</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chk-hypertension">
+                  <span>💓 Hypertension / BP</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chk-asthma">
+                  <span>🫁 Asthma</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label for="patient-allergies" style="font-size: 12px; font-weight: 600; color: #b91c1c;">
+                  ⚠️ Known Drug Allergies (Omit Incompatible Generic Medicines):
+                </label>
+                <input type="text" id="patient-allergies" class="form-input" placeholder="e.g. Penicillin, NSAIDs/Aspirin, Sulfa (leave blank if none)">
+              </div>
+            </div>
+
           </div>
 
           <!-- Voice & Symptom Input Card -->
@@ -137,7 +247,14 @@
                 🎤
               </button>
               <div class="voice-status-text" id="voice-status">Tap Microphone and Speak Symptoms</div>
-              <div class="voice-subtext" id="voice-subtext">Supports Hindi, English, and regional accents (Offline Vosk/Whisper ready)</div>
+              <div class="voice-subtext" id="voice-subtext">Supports Chhattisgarhi, Hindi, English, and regional Indian dialects</div>
+              <!-- Speech Recognition Dialect Quick Switcher (Option 5) -->
+              <div class="voice-dialect-bar">
+                <span class="voice-dialect-hint" id="voice-dialect-hint">Voice Input Dialect:</span>
+                <button type="button" class="btn-voice-dialect-badge" id="voice-dialect-btn" onclick="openLanguageModal()" title="Change speech recognition dialect">
+                  <span id="voice-dialect-flag">🇬🇧</span> <span id="voice-dialect-label">English (en-IN)</span> ▾
+                </button>
+              </div>
             </div>
 
             <!-- Symptom Textarea -->
@@ -193,6 +310,37 @@
           <!-- Active Triage Results Card -->
           <div class="card results-card" id="results-card">
             
+            <!-- Dynamic Clinical Report Translation Toolbar -->
+            <div class="report-translation-bar" id="report-translation-bar">
+              <div class="trans-bar-info">
+                <span class="trans-icon">🌐</span>
+                <span id="trans-bar-title">Translate Clinical Guidance:</span>
+              </div>
+              <div class="trans-bar-actions">
+                <select id="results-lang-select" class="form-select trans-select" onchange="translateActiveTriageResults(this.value)">
+                  <!-- Injected via JS -->
+                </select>
+                <button type="button" class="btn-secondary btn-trans-apply" id="btn-retranslate" onclick="translateActiveTriageResults(document.getElementById('results-lang-select').value)">
+                  ⚡ <span id="btn-retranslate-text">Translate</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Emergency Red-Flag Symptom Override Banner -->
+            <div class="emergency-override-banner" id="emergency-banner">
+              <div class="emergency-title">
+                <span>🚨</span> <span>EMERGENCY MEDICAL OVERRIDE ACTIVATED</span>
+              </div>
+              <div class="emergency-body" id="emergency-body-text">
+                Critical life-threatening symptom detected! Bypassing non-urgent triage. Arrange immediate 108 Emergency Ambulance transport to Primary Health Centre (PHC) or District Hospital without delay.
+              </div>
+            </div>
+
+            <!-- Follow-up Scheduled Date Badge -->
+            <div class="followup-badge" id="followup-badge-display">
+              <span>📅</span> <span id="followup-text">Next Scheduled Follow-up: 2026-09-30 (7 days)</span>
+            </div>
+
             <!-- Acuity Level Banner -->
             <div class="triage-acuity-banner" id="acuity-banner">
               <div class="acuity-icon" id="acuity-icon">⚠️</div>
@@ -202,13 +350,69 @@
               </div>
             </div>
 
+            <!-- Telemedicine Video Call Card (Mandatory for Medium Risk - No Self Cure) -->
+            <div class="telemedicine-card" id="telemedicine-card" style="display: none;">
+              <div class="telemed-header">
+                <div class="telemed-badge">
+                  <span class="live-pulse"></span>
+                  <span>ONLINE DOCTOR ON STANDBY</span>
+                </div>
+                <span class="telemed-tag">e-Sanjeevani Telehealth Hub</span>
+              </div>
+              <div class="telemed-body">
+                <div class="telemed-doctor-info">
+                  <div class="doctor-avatar">👩‍⚕️</div>
+                  <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+                      <h4 class="doctor-name" id="telemed-doctor-name">Dr. Anjali Verma, MBBS</h4>
+                      <span class="doctor-status-badge">🟢 Online & Ready</span>
+                    </div>
+                    <div class="doctor-title" id="telemed-doctor-role">Duty Medical Officer • Rural Primary Telemedicine Network</div>
+                    <div class="telemed-alert-note">
+                      ⚠️ <strong>Self-cure is NOT recommended for this risk level.</strong> Direct clinical evaluation by an online doctor is required. Connect to the medical officer now via face-to-face video consultation.
+                    </div>
+                  </div>
+                </div>
+                <div class="telemed-actions">
+                  <button type="button" class="btn-video-call" id="btn-start-video-call" onclick="openVideoConsultation()">
+                    <span class="video-icon">📹</span>
+                    <span>Connect to Doctor Online (Live Video Call)</span>
+                  </button>
+                  <button type="button" class="btn-copy-link" onclick="copyVideoLink()" title="Copy Video Consultation Link">
+                    📋 Copy Call Link
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- Longitudinal Risk Alert Card (Progressing / Chronic Alert) -->
             <div class="longitudinal-alert-card" id="longitudinal-alert-box">
               <div class="longitudinal-header">
                 <span>⏱️</span> <span id="longitudinal-title">Longitudinal Risk Alert (Patient History)</span>
               </div>
               <div class="longitudinal-body" id="longitudinal-message">
-                Key symptoms ('cough', 'fever') recurred across 2 visits within the last 60 days. Risk escalated to Medium to ensure timely clinical evaluation.
+                Key symptoms recurred across multiple visits within the last 60 days. Risk escalated to ensure timely clinical evaluation.
+              </div>
+            </div>
+
+            <!-- AI Explainability Panel ("Why this Risk was Assigned") -->
+            <div class="explain-panel" id="explain-panel-box">
+              <div class="explain-title">
+                <span>🔍</span> <span>Clinical Risk Rationale (Why this Risk was Assigned):</span>
+              </div>
+              <ul class="explain-reasons-list" id="explain-reasons-list">
+                <!-- Dynamically populated -->
+              </ul>
+            </div>
+
+            <!-- Top-3 Differential Diagnoses Ranking with Confidence -->
+            <div class="differential-container" id="differential-box">
+              <div class="differential-header">
+                <span>🎯 Top Differential Diagnoses</span>
+                <span style="font-weight: 500; font-size: 11px;">Relative Confidence</span>
+              </div>
+              <div id="differential-items-list">
+                <!-- Dynamically populated -->
               </div>
             </div>
 
@@ -240,7 +444,7 @@
               </ul>
             </div>
 
-            <!-- Affordable Generic Medicines (Jan Aushadhi Scheme) -->
+            <!-- Affordable Generic Medicines (Jan Aushadhi Scheme with Allergy Screening) -->
             <div class="generic-meds-card" id="generic-meds-container">
               <div class="generic-meds-title">
                 <span>💊 Affordable Generic Alternatives</span>
@@ -250,18 +454,37 @@
                 <!-- Injected via JS -->
               </div>
               <div style="font-size: 11.5px; color: #166534; margin-top: 10px; font-style: italic;">
-                * Available at nearby Pradhan Mantri Bhartiya Jan Aushadhi Kendras. Always consult a healthcare officer for prescription medicines.
+                * Available at nearby Pradhan Mantri Bhartiya Jan Aushadhi Kendras. Filtered against patient drug allergies. Always consult a medical officer before prescription drugs.
               </div>
             </div>
 
-            <!-- Doctor Referral Action Slip -->
+            <!-- Doctor Referral Action Slip & Status Tracker -->
             <div class="referral-box" id="referral-slip-box">
               <div class="referral-header">🏥 Referral Guidance Slip</div>
               <div class="referral-facility" id="referral-facility">Primary Health Centre (PHC)</div>
               <div class="referral-action" id="referral-action">Accompany patient or arrange 108 ambulance transport.</div>
-              <div style="margin-top: 12px; display: flex; gap: 8px;">
+              
+              <!-- Referral Loop Status Tracker -->
+              <div style="margin-top: 12px; padding: 10px; background: white; border-radius: 6px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-muted);">
+                  Care-Loop Status:
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <select id="referral-status-select" class="form-select" style="padding: 4px 8px; font-size: 12px;">
+                    <option value="Referral Generated">1. Referral Generated</option>
+                    <option value="Hospital Visited">2. Hospital Visited</option>
+                    <option value="Doctor Consulted">3. Doctor Consulted</option>
+                    <option value="Recovered">4. Recovered</option>
+                  </select>
+                  <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="updateActiveReferralStatus()">
+                    Save Status
+                  </button>
+                </div>
+              </div>
+
+              <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
                 <button type="button" class="btn-secondary" onclick="printReferralSlip()" id="btn-print-slip">
-                  🖨️ Print / Save Referral Slip
+                  🖨️ Print / Save Consultation Report
                 </button>
                 <button type="button" class="btn-secondary" onclick="viewPatientTimeline()" id="btn-view-timeline">
                   📜 View Health Timeline
@@ -314,14 +537,82 @@
       </div>
     </div>
 
-    <!-- TAB 3: ABOUT & ARCHITECTURE -->
+    <!-- TAB 3: HEALTH ANALYTICS & VILLAGE OUTBREAK DASHBOARD -->
+    <div id="tab-analytics" class="tab-content">
+      
+      <!-- Metric Cards Grid -->
+      <div class="analytics-grid" id="analytics-metrics-grid">
+        <div class="analytics-metric-card">
+          <div class="metric-label">Total Consultations</div>
+          <div class="metric-value" id="metric-total-consults">--</div>
+          <div class="metric-sub">Across rural kiosks & ASHA workers</div>
+        </div>
+        <div class="analytics-metric-card">
+          <div class="metric-label">Registered Patients</div>
+          <div class="metric-value" id="metric-total-patients">--</div>
+          <div class="metric-sub">With unique Patient IDs</div>
+        </div>
+        <div class="analytics-metric-card">
+          <div class="metric-label">High Risk Referrals</div>
+          <div class="metric-value metric-high" id="metric-high-risk">--</div>
+          <div class="metric-sub">Emergency & urgent PHC referrals</div>
+        </div>
+        <div class="analytics-metric-card">
+          <div class="metric-label">Emergency Overrides</div>
+          <div class="metric-value metric-high" id="metric-emergency-overrides">--</div>
+          <div class="metric-sub">Life-safety red flags intercepted</div>
+        </div>
+      </div>
+
+      <!-- Outbreak Surveillance & Follow-ups Grid -->
+      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; align-items: start;">
+        
+        <!-- Village Outbreak Heatmap Table -->
+        <div class="outbreak-card">
+          <div class="outbreak-title">
+            <span>🗺️ Village Symptom Clusters (Early Outbreak Signal)</span>
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Aggregated by Gram</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="patient-table">
+              <thead>
+                <tr>
+                  <th>Village</th>
+                  <th>Consultations</th>
+                  <th>High Risk</th>
+                  <th>Primary Condition</th>
+                </tr>
+              </thead>
+              <tbody id="outbreak-table-body">
+                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Loading village statistics...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Follow-ups Due Today List -->
+        <div class="outbreak-card">
+          <div class="outbreak-title">
+            <span>🔔 Follow-ups Due for ASHA Worker</span>
+            <span style="font-size: 11px; background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 10px; font-weight: 700;" id="followups-due-count">0 Due</span>
+          </div>
+          <div id="followups-list-body" style="max-height: 280px; overflow-y: auto;">
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">No pending follow-ups due today.</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 4: ABOUT & ARCHITECTURE -->
     <div id="tab-about" class="tab-content">
       <div class="card">
         <div class="card-header">
           <div class="card-title">
             <span>ℹ️</span> <span>About GramCare AI – Rural Decision-Support System</span>
           </div>
-          <span class="card-badge">Version 1.1.0</span>
+          <span class="card-badge">Version 1.2.0</span>
         </div>
 
         <div style="font-size: 14px; line-height: 1.7; color: var(--text-main);">
@@ -335,14 +626,19 @@
             "GramCare AI does <strong>not</strong> replace doctors. It acts as an early decision-support system to determine whether home care is sufficient, or if clinical consultation and emergency referral are necessary."
           </blockquote>
 
-          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">3. Longitudinal Risk Engine</h3>
+          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">3. Emergency Symptom Override & Clinical Explainability</h3>
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            Critical life-threatening symptoms (e.g. chest pain, respiratory distress, loss of consciousness, stroke symptoms) bypass the machine learning model immediately to <strong>HIGH RISK</strong> with emergency ambulance and PHC referral. The AI Explainability panel provides transparent clinical reasoning for every risk decision.
+          </p>
+
+          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">4. Longitudinal Risk Engine</h3>
           <p style="color: var(--text-muted); margin-bottom: 16px;">
             Unlike isolated triage tools that only evaluate a single consultation, GramCare AI queries previous consultations within the last 30–60 days. If key symptoms recur or worsen across multiple visits, the system escalates the risk level and alerts the ASHA worker that the patient may have a progressing or chronic condition requiring clinical diagnosis.
           </p>
 
-          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">4. Affordable Generic Medicines</h3>
+          <h3 style="font-family: var(--font-heading); margin-bottom: 8px;">5. Affordable Generic Medicines</h3>
           <p style="color: var(--text-muted);">
-            To reduce the financial burden of healthcare on rural families, GramCare AI highlights generic molecule equivalents available under the Pradhan Mantri Bhartiya Jan Aushadhi Pariyojana, offering estimated cost savings of 50% to 80% over commercial branded drugs.
+            To reduce the financial burden of healthcare on rural families, GramCare AI highlights generic molecule equivalents available under the Pradhan Mantri Bhartiya Jan Aushadhi Pariyojana, offering estimated cost savings of 50% to 80% over commercial branded drugs, filtered against patient drug allergies.
           </p>
         </div>
       </div>
@@ -359,6 +655,328 @@
       </div>
       <div class="modal-body" id="timeline-modal-body">
         <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Live Telemedicine Video Consultation -->
+  <div class="modal-overlay" id="video-call-modal" style="display: none;">
+    <div class="modal-card video-modal-card">
+      <div class="modal-header video-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="pulse-dot" style="width: 12px; height: 12px; background: #22c55e;"></div>
+          <div>
+            <div class="modal-title" style="font-size: 16px;">Live Telemedicine Video Consultation</div>
+            <div style="font-size: 12px; color: var(--text-muted);" id="video-modal-subtitle">
+              Connecting with Dr. Anjali Verma, MBBS • e-Sanjeevani Network
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="call-timer-badge" id="call-timer-display">00:00</span>
+          <button class="modal-close" onclick="closeVideoConsultation()">&times;</button>
+        </div>
+      </div>
+      <div class="video-modal-body">
+        <!-- Main Video Screen Area -->
+        <div class="video-screen-container">
+          <div class="video-loading-placeholder" id="video-placeholder">
+            <div class="pulse-dot" style="width: 32px; height: 32px; margin: 0 auto 16px;"></div>
+            <h4 style="color: white; font-family: var(--font-heading);">Connecting to Doctor's Secure Video Stream...</h4>
+            <p style="font-size: 13px; color: #94a3b8; margin-top: 6px;">
+              Initializing encrypted WebRTC peer connection (e-Sanjeevani / Jitsi Meet)...
+            </p>
+          </div>
+          <iframe id="video-frame" class="video-iframe" allow="camera; microphone; display-capture; autoplay; clipboard-write" allowfullscreen></iframe>
+          
+          <!-- In-Call Floating Control Bar -->
+          <div class="video-controls-bar">
+            <button type="button" class="ctrl-btn" id="btn-toggle-mic" onclick="toggleCallMic()" title="Mute/Unmute Mic">
+              🎤 Mic On
+            </button>
+            <button type="button" class="ctrl-btn" id="btn-toggle-cam" onclick="toggleCallCam()" title="Camera On/Off">
+              📷 Cam On
+            </button>
+            <button type="button" class="ctrl-btn btn-end-call" onclick="closeVideoConsultation()" title="End Consultation">
+              📞 End Call
+            </button>
+          </div>
+        </div>
+
+        <!-- Clinical Patient Brief Sidebar -->
+        <div class="video-sidebar">
+          <div class="sidebar-sec-title">📋 Clinical Patient Summary</div>
+          <div class="patient-brief-item">
+            <span class="brief-label">Patient:</span>
+            <span class="brief-val" id="telemed-patient-name">Patient</span>
+          </div>
+          <div class="patient-brief-item">
+            <span class="brief-label">Age / Gender:</span>
+            <span class="brief-val" id="telemed-patient-meta">--</span>
+          </div>
+          <div class="patient-brief-item">
+            <span class="brief-label">Village:</span>
+            <span class="brief-val" id="telemed-patient-village">--</span>
+          </div>
+          <div class="patient-brief-item">
+            <span class="brief-label">Risk Category:</span>
+            <span class="brief-val" style="color: var(--risk-medium); font-weight: 800;">MEDIUM RISK</span>
+          </div>
+          <div class="patient-brief-item">
+            <span class="brief-label">Evaluated Condition:</span>
+            <span class="brief-val" id="telemed-patient-condition">--</span>
+          </div>
+
+          <div style="margin-top: 14px;">
+            <div class="brief-label" style="margin-bottom: 4px;">Reported Symptoms:</div>
+            <div class="brief-symptoms-box" id="telemed-patient-symptoms">--</div>
+          </div>
+
+          <div class="telemed-protocol-note">
+            ℹ️ <strong>Protocol:</strong> Self-cure disabled for Medium Risk. Doctor assessment and e-Prescription required.
+          </div>
+
+          <div style="margin-top: 16px;">
+            <button type="button" class="btn-primary" style="width: 100%; font-size: 13px; padding: 10px;" onclick="completeConsultationDialog()">
+              ✅ Mark Consultation Completed
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: User Authentication & Role Access -->
+  <div class="modal-overlay" id="auth-modal" style="display: none;">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title">🔐 GramCare Account & Data Privacy</div>
+        <button class="modal-close" onclick="closeAuthModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Role Switch Tabs -->
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab-btn active" id="tab-login-asha" onclick="switchAuthTab('asha')">👩‍⚕️ ASHA Worker</button>
+          <button type="button" class="auth-tab-btn" id="tab-login-patient" onclick="switchAuthTab('patient')">👤 Patient Self</button>
+          <button type="button" class="auth-tab-btn" id="tab-login-register" onclick="switchAuthTab('register')">➕ Register</button>
+        </div>
+
+        <!-- Fast 1-Click Demo Logins -->
+        <div class="fast-demo-box">
+          <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">FAST 1-CLICK DEMO LOGIN:</div>
+          <div style="display: flex; gap: 8px; flex-direction: column;">
+            <button type="button" class="btn-demo-auth" onclick="demoLoginAsha()">
+              👩‍⚕️ <strong>Login as ASHA Worker</strong> (Sunita Devi, Rampur)
+            </button>
+            <button type="button" class="btn-demo-auth" onclick="demoLoginPatient()">
+              👤 <strong>Login as Self Patient</strong> (Ramesh Kumar & Family Vault)
+            </button>
+          </div>
+        </div>
+
+        <!-- Google Single Sign-On Option -->
+        <div style="margin-bottom: 16px;">
+          <button type="button" class="btn-google-login" onclick="triggerGoogleLogin()" title="Sign in with your Google Account">
+            <svg class="google-icon" viewBox="0 0 24 24" width="18" height="18">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+          <div class="auth-divider">
+            <span>OR WITH EMAIL & PASSWORD</span>
+          </div>
+        </div>
+
+        <!-- Login / Register Form -->
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+          <div class="form-group" id="auth-fullname-group" style="display: none; margin-bottom: 12px;">
+            <label for="auth-fullname">Full Name *</label>
+            <input type="text" id="auth-fullname" class="form-input" placeholder="e.g. Ramesh Kumar">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="auth-username" id="lbl-auth-username">Worker ID / Mobile Number / Email *</label>
+            <input type="text" id="auth-username" class="form-input" placeholder="e.g. asha@gramcare.gov.in" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="auth-password">Password *</label>
+            <input type="password" id="auth-password" class="form-input" placeholder="••••••••" required>
+          </div>
+
+          <div class="form-group" id="auth-village-group" style="display: none; margin-bottom: 12px;">
+            <label for="auth-village">Village / Gram</label>
+            <input type="text" id="auth-village" class="form-input" placeholder="e.g. Rampur">
+          </div>
+
+          <div style="margin-top: 18px;">
+            <button type="submit" class="btn-primary" style="width: 100%;" id="btn-auth-submit">
+              Sign In to GramCare
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Family Member to Vault -->
+  <div class="modal-overlay" id="family-modal" style="display: none;">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title">👨‍👩‍👧 Add Family Member to Vault</div>
+        <button class="modal-close" onclick="closeAddFamilyModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Register family dependents (children, spouse, parents) under your secure account. Consultations will be tracked separately for clinical safety and privacy.
+        </p>
+        <form id="family-member-form" onsubmit="handleAddFamilySubmit(event)">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="fam-name">Full Name *</label>
+            <input type="text" id="fam-name" class="form-input" placeholder="e.g. Priya Sharma" required>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 12px;">
+            <div class="form-group">
+              <label for="fam-relation">Relationship *</label>
+              <select id="fam-relation" class="form-select" required>
+                <option value="Spouse">Spouse</option>
+                <option value="Child" selected>Child</option>
+                <option value="Parent">Parent / Elder</option>
+                <option value="Sibling">Sibling</option>
+                <option value="Other">Other Dependent</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="fam-age">Age *</label>
+              <input type="number" id="fam-age" class="form-input" placeholder="e.g. 7" min="0" max="120" required>
+            </div>
+            <div class="form-group">
+              <label for="fam-gender">Gender</label>
+              <select id="fam-gender" class="form-select">
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="fam-comorbidities">Known Medical Conditions (comma-separated)</label>
+            <input type="text" id="fam-comorbidities" class="form-input" placeholder="e.g. Asthma, Diabetes">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="fam-allergies">Drug Allergies (comma-separated)</label>
+            <input type="text" id="fam-allergies" class="form-input" placeholder="e.g. NSAIDs, Penicillin">
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn-secondary" onclick="closeAddFamilyModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Save to Family Vault</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: ASHA Issued Patient Tokens List -->
+  <div class="modal-overlay" id="asha-tokens-modal" style="display: none;">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div class="modal-title">🎟️ Issued Patient Intake Tokens</div>
+        <button class="modal-close" onclick="closeAshaTokensModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+          Token IDs issued during village visits. Click any token to load patient details into the triage intake form.
+        </p>
+        <div id="asha-tokens-table-container">
+          <!-- Dynamically rendered tokens -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Comprehensive Language & Regional Dialect Center (Option 3) -->
+  <div class="modal-overlay" id="language-modal" style="display: none;">
+    <div class="modal-card lang-modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">🌐</span>
+          <div>
+            <div class="modal-title" id="modal-lang-title">Language & Regional Dialect Center</div>
+            <div style="font-size: 12px; color: var(--text-muted);" id="modal-lang-subtitle">
+              Choose your preferred language or rural dialect (Chhattisgarhi, Hindi, etc.)
+            </div>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeLanguageModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Search & Provider Engine Selection -->
+        <div class="lang-modal-toolbar">
+          <div class="lang-search-wrapper">
+            <span class="search-lens">🔍</span>
+            <input type="text" id="lang-modal-search" class="form-input lang-search-input" placeholder="Search languages (e.g. Chhattisgarhi, छत्तीसगढ़ी, Hindi, বাংলা, Tamil)..." oninput="filterLanguagesModal(this.value)">
+          </div>
+          <div class="lang-engine-wrapper">
+            <label for="lang-engine-select" class="lang-engine-label">Translation API Provider:</label>
+            <select id="lang-engine-select" class="form-select lang-engine-dropdown" onchange="handleEngineChange(this.value)">
+              <option value="auto">⚡ Auto Intelligent (Best Available)</option>
+              <option value="gemini">✨ Google Gemini LLM (Deep Dialect Support)</option>
+              <option value="google">🌐 Google Cloud / Free API</option>
+              <option value="deepl">🔷 DeepL API</option>
+              <option value="openai">🤖 OpenAI API</option>
+              <option value="static">⚡ Offline Localized Dictionaries</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Regional Category Filter Pills -->
+        <div class="lang-region-pills" id="lang-region-pills">
+          <button type="button" class="region-pill active" onclick="filterLanguagesByRegion('all', this)">All Languages (14)</button>
+          <button type="button" class="region-pill" onclick="filterLanguagesByRegion('rural', this)">🌾 Rural & Central (CG, Hindi, Bhojpuri)</button>
+          <button type="button" class="region-pill" onclick="filterLanguagesByRegion('east', this)">East (Bengali, Odia)</button>
+          <button type="button" class="region-pill" onclick="filterLanguagesByRegion('west', this)">West (Marathi, Gujarati)</button>
+          <button type="button" class="region-pill" onclick="filterLanguagesByRegion('south', this)">South (Telugu, Tamil, Kannada, Malayalam)</button>
+          <button type="button" class="region-pill" onclick="filterLanguagesByRegion('north', this)">North (Punjabi, Urdu)</button>
+          <button type="button" class="region-pill" onclick="filterLanguagesByRegion('global', this)">Global (English)</button>
+        </div>
+
+        <!-- Languages Grid -->
+        <div class="lang-cards-grid" id="lang-cards-grid">
+          <!-- Dynamically populated via JS -->
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface-alt);">
+        <div style="font-size: 12px; color: var(--text-muted);">
+          Selected Language: <strong id="modal-selected-lang-label" style="color: var(--primary);">English</strong>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn-secondary" onclick="closeLanguageModal()">Cancel</button>
+          <button type="button" class="btn-primary" onclick="applyModalLanguageSelection()">Apply Language</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Quick Language Switcher FAB (Option 4) -->
+  <div class="floating-lang-fab" id="floating-lang-fab">
+    <button type="button" class="btn-lang-fab" onclick="toggleFloatingLangMenu()" title="Quick Language Switcher">
+      <span class="fab-flag" id="fab-flag-icon">🇬🇧</span>
+      <span class="fab-code" id="fab-lang-code">EN</span>
+    </button>
+    <div class="floating-lang-menu" id="floating-lang-menu" style="display: none;">
+      <div class="floating-menu-header">🌐 Quick Language Switch</div>
+      <div class="floating-menu-list" id="floating-lang-items">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="floating-menu-footer">
+        <button type="button" class="btn-floating-all" onclick="openLanguageModal(); toggleFloatingLangMenu();">⚙️ All Languages & Dialects...</button>
       </div>
     </div>
   </div>
